@@ -22,10 +22,11 @@ WHITE = (255, 255, 255)
 RED = (200,0,0)
 BLUE1 = (0, 0, 255)
 BLUE2 = (0, 100, 255)
+BLUEH = (0, 100, 150)
 BLACK = (0,0,0)
 
 BLOCK_SIZE = 20 # use a value divisible by 5
-SPEED = 10
+SPEED = 20000
 
 class SnakeGameAi:
     
@@ -87,13 +88,13 @@ class SnakeGameAi:
         # end game if there is a collision or if too much time passed without anything happening
         if self._is_collision() or self.frame_iteration > 100*len(self.snake):
             game_over = True
-            reward = - 10
+            reward = - 1
             return reward, game_over, self.score
             
         # 4. place new food or just move
         if self.head == self.food:
             self.score += 1
-            reward = 10
+            reward = 10 * self.score
             self._place_food()
         else:
             self.snake.pop()
@@ -122,8 +123,12 @@ class SnakeGameAi:
     def _update_ui(self):
         self.display.fill(BLACK)
         
-        # render the snake
-        for pt in self.snake:
+        # render the snake head
+        pygame.draw.rect(self.display, BLUEH, pygame.Rect(self.snake[0].x, self.snake[0].y, 
+                                                            BLOCK_SIZE, BLOCK_SIZE))
+
+        # render the snake tail
+        for pt in self.snake[1:]:
             pygame.draw.rect(self.display, BLUE1, pygame.Rect(pt.x, pt.y, BLOCK_SIZE, BLOCK_SIZE))
             pygame.draw.rect(self.display, BLUE2, pygame.Rect(pt.x+BLOCK_SIZE//5, pt.y+BLOCK_SIZE//5, 
                                                                     BLOCK_SIZE//5*3, BLOCK_SIZE//5*3))
@@ -149,6 +154,8 @@ class SnakeGameAi:
         else:
             next_idx = (action_idx - 1) % 4
             new_dir = clock_wise[next_idx] # left turn r -> u -> l -> d
+
+        self.direction = new_dir
 
         x = self.head.x
         y = self.head.y
