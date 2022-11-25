@@ -31,11 +31,12 @@ SPEED = 4000
 
 
 class SnakeGameAi:
-    def __init__(self, w=640, h=480, speed=20, block_size=20):
+    def __init__(self, w=640, h=480, speed=20, block_size=20, display_game=True):
         self.w = w
         self.h = h
         self.speed = speed
         self.block_size = block_size
+        self.display_game = display_game
 
         # init display
         self.display = pygame.display.set_mode((self.w, self.h))
@@ -104,7 +105,7 @@ class SnakeGameAi:
 
         reward = 0
         game_over = False
-        if self.is_collision() or self.frame_iteration > 100*len(self.snake):
+        if self.is_collision():
             game_over = True
             reward = -10
             return reward, game_over, self.score
@@ -118,7 +119,8 @@ class SnakeGameAi:
             self.snake.pop()
 
         # 5. update ui and clock
-        self._update_ui()
+        if self.display_game:
+            self._update_ui()
         self.clock.tick(self.speed)
 
         # 6. return game over and score
@@ -216,7 +218,7 @@ class SnakeGameAi:
 
 
 if __name__ == "__main__":
-    game = SnakeGameAi()
+    game = SnakeGameAi(display_game = True)
 
     # game loop
     while True:

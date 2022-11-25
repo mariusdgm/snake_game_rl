@@ -4,7 +4,7 @@ import numpy as np
 from collections import deque
 
 from snake_game_ai import SnakeGameAi, Direction, Point
-from model import Linear_QNet, QTrainer
+from model_simple import Linear_QNet, QTrainer
 from helper import plot
 
 MAX_MEMORY = 100_000
@@ -12,7 +12,7 @@ BATCH_SIZE = 1000
 Lr = 0.001
 
 
-class Agent:
+class AgentSimpleDQN:
     def __init__(self) -> None:
         self.n_games = 0
         self.epsilon = 0.9  # randomness
@@ -83,13 +83,12 @@ class Agent:
         self.trainer.train_step(state, action, reward, next_state, done)
 
     def get_action(self, state):
-        # self.epsilon = max(0.01, self.epsilon * self.epsilon_decay)
-        # if self.n_games > 150:
-        #     self.epsilon = 0
-        #     self.exploration = False
-        # final_move = [0, 0, 0]
-        # if self.exploration and (random.randint(0, 100) < self.epsilon * 100):
-        self.epsilon = 80 - self.n_games
+        self.epsilon = max(0.01, self.epsilon * self.epsilon_decay)
+        if self.n_games > 100:
+            self.epsilon = 0
+            self.exploration = False
+      
+        # get either a random move for exploration or an expected move from the model
         final_move = [0,0,0]
         if random.randint(0, 200) < self.epsilon:
             move = random.randint(0, 2)
@@ -108,9 +107,10 @@ def train():
     plot_mean_scores = []
     total_score = 0
     record = 0
-    agent = Agent()
-    game = SnakeGameAi(speed=2000000)
+    agent = AgentSimpleDQN()
+    game = SnakeGameAi(speed=2000000, display_game = True)
 
+    skip_limit = 100
     while True:
         # get old state
         state_old = agent.get_state(game)
@@ -133,6 +133,9 @@ def train():
             game.reset()
             agent.n_games += 1
             agent.train_long_memory()
+
+            if agent.n_games > skip_limit:
+                game.display_game = True
 
             if score > record:
                 record = score
