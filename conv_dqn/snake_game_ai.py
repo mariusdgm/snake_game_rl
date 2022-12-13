@@ -93,16 +93,6 @@ class SnakeGameAi:
         self.snake.insert(0, self.head)
 
         # end game if there is a collision or if too much time passed without anything happening
-        # if self.is_collision():
-        #     game_over = True
-        #     reward = -10
-        #     return reward, game_over, self.score
-
-        # if self.frame_iteration > 100 * len(self.snake):
-        #     game_over = True
-        #     reward = -10
-        #     return reward, game_over, self.score
-
         reward = 0
         game_over = False
         if self.is_collision() or self.frame_iteration > 100*len(self.snake):
@@ -113,7 +103,7 @@ class SnakeGameAi:
         # 4. place new food or just move
         if self.head == self.food:
             self.score += 1
-            reward = 10
+            reward = 20
             self._place_food()
         else:
             self.snake.pop()
@@ -121,7 +111,7 @@ class SnakeGameAi:
         # 5. update ui and clock
         if self.display_game:
             self._update_ui()
-        self.clock.tick(self.speed)
+            self.clock.tick(self.speed)
 
         # 6. return game over and score
         return reward, game_over, self.score
@@ -187,20 +177,20 @@ class SnakeGameAi:
 
     def _move(self, action):
         # [straight, right, left] actions
-        # what about [right, down, left, up] directly?
 
         clock_wise = [Direction.RIGHT, Direction.DOWN, Direction.LEFT, Direction.UP]
         action_idx = clock_wise.index(self.direction)
 
         if np.array_equal(action, [1, 0, 0]):
             new_dir = clock_wise[action_idx]
+        
         elif np.array_equal(action, [0, 1, 0]):
             next_idx = (action_idx + 1) % 4
             new_dir = clock_wise[next_idx]  # right turn r -> d -> l -> u
         else:
             next_idx = (action_idx - 1) % 4
             new_dir = clock_wise[next_idx]  # left turn r -> u -> l -> d
-
+  
         self.direction = new_dir
 
         x = self.head.x
