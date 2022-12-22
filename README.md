@@ -13,6 +13,6 @@ The first DQN solution as presented in the credited tutorial.
 The agent is able to learn to hunt for the food, but since it does not keep track of its tail it ends up entraping itself.
 
 ### Conv DQN
-COnvolutional DQN where the input is a matrix describing the complete environment state. This approach aims to allow the snake to avoid getting trapped by its own tail.
+Convolutional DQN where the input is a matrix describing the complete environment state. This approach aims to allow the snake to avoid getting trapped by its own tail.
 
 Credits: code developed starting from https://github.com/python-engineer/snake-ai-pytorch

@@ -21,9 +21,9 @@ class Conv_QNet(nn.Module):
 
         # conv layers
         self.features = nn.Sequential(
-            nn.Conv2d(self.input_shape[0], 16, kernel_size=3, stride=2),
+            nn.Conv2d(2, 32, kernel_size=5, stride=1),
             nn.ReLU(),
-            nn.Conv2d(16, 32, kernel_size=2, stride=1),
+            nn.Conv2d(32, 16, kernel_size=3, stride=1),
             nn.ReLU(),
         )
 

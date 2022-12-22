@@ -77,7 +77,7 @@ class SnakeGameAi:
 
     def play_step(self, action):
         self.frame_iteration += 1
-        reward = 0
+        reward = -1
         game_over = False
 
         # 1. collect user input
@@ -92,18 +92,26 @@ class SnakeGameAi:
         self._move(action)  # update the head
         self.snake.insert(0, self.head)
 
-        # end game if there is a collision or if too much time passed without anything happening
+        # end game if there is a collision or 
         reward = 0
         game_over = False
-        if self.is_collision() or self.frame_iteration > 100*len(self.snake):
+        if self.is_collision():
             game_over = True
             reward = -10
+            # reward = 0 # use 0 so the snake learns to go after food
+
+            return reward, game_over, self.score
+
+        # if too much time passed without anything happening
+        if self.frame_iteration > 100*len(self.snake):
+            game_over = True
+            reward = 0
             return reward, game_over, self.score
 
         # 4. place new food or just move
         if self.head == self.food:
             self.score += 1
-            reward = 20
+            reward = 50 + self.score * 10
             self._place_food()
         else:
             self.snake.pop()
