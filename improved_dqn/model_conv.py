@@ -8,10 +8,6 @@ import os
 import numpy as np
 import random
 
-# USE_CUDA = torch.cuda.is_available()
-USE_CUDA = False
-Variable = lambda *args, **kwargs: autograd.Variable(*args, **kwargs).cuda() if USE_CUDA else autograd.Variable(*args, **kwargs)
-
 class Conv_QNet(nn.Module):
     def __init__(self, input_shape, num_actions):
         super().__init__()
@@ -34,12 +30,30 @@ class Conv_QNet(nn.Module):
         )
 
     def feature_size(self):
-        return self.features(autograd.Variable(torch.zeros(*self.input_shape))).view(1, -1).size(1)
+        return self.features(autograd.torch.zeros(*self.input_shape)).view(1, -1).size(1)
 
     def forward(self, x):
         x = self.features(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
+        return x
+
+
+class Linear_QNet(nn.Module):
+    def __init__(self, input_size, output_size):
+        super().__init__()
+
+        self.num_actions = output_size
+
+        self.fc1 = nn.Linear(input_size, 64)
+        self.fc2 = nn.Linear(64, 64)
+        self.fc3 = nn.Linear(64, self.num_actions)
+
+    def forward(self, x):
+        """Called when calling model(x)"""
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
         return x
 
 

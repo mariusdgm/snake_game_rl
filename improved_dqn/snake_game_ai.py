@@ -31,7 +31,7 @@ SPEED = 4000
 
 
 class SnakeGameAi:
-    def __init__(self, w=640, h=640, speed=20, block_size=20, display_game=True):
+    def __init__(self, w=200, h=200, speed=20, block_size=20, display_game=True):
         self.w = w
         self.h = h
         self.speed = speed
@@ -77,7 +77,7 @@ class SnakeGameAi:
 
     def play_step(self, action):
         self.frame_iteration += 1
-        reward = -1
+        reward = 0
         game_over = False
 
         # 1. collect user input
@@ -97,7 +97,7 @@ class SnakeGameAi:
         game_over = False
         if self.is_collision():
             game_over = True
-            reward = -10
+            reward = -1
             # reward = 0 # use 0 so the snake learns to go after food
 
             return reward, game_over, self.score
@@ -111,7 +111,7 @@ class SnakeGameAi:
         # 4. place new food or just move
         if self.head == self.food:
             self.score += 1
-            reward = 50 + self.score * 10
+            reward = 1
             self._place_food()
         else:
             self.snake.pop()

@@ -5,20 +5,13 @@ import copy
 from collections import deque, Counter
 
 from snake_game_ai import SnakeGameAi, Direction, Point
-from model_conv import Conv_QNet
+from model_conv import Conv_QNet, Linear_QNet
 from helper import plot
 import torch.autograd as autograd
 
+import seaborn as sns
+
 from torch import optim
-
-# USE_CUDA = torch.cuda.is_available()
-USE_CUDA = False
-Variable = (
-    lambda *args, **kwargs: autograd.Variable(*args, **kwargs).cuda()
-    if USE_CUDA
-    else autograd.Variable(*args, **kwargs)
-)
-
 
 class ReplayBuffer(object):
     def __init__(self, capacity):
@@ -43,12 +36,12 @@ class ReplayBuffer(object):
 class AgentConvDQN:
     def __init__(self, train_model, target_model, optimizer) -> None:
 
-        self.epsilon_by_frame = self._get_decay_function(start=1.0, end=0.01, decay=600)
+        self.epsilon_by_frame = self._get_decay_function(start=1.0, end=0.01, decay=100)
         self.n_experiments = 0
         self.n_frames = 0
 
         self.exploration = True
-        self.gamma = 0.9  # discount rate
+        self.gamma = 0.99  # discount rate
         self.replay_buffer = ReplayBuffer(100000)
 
         self.train_model = train_model
@@ -62,60 +55,108 @@ class AgentConvDQN:
         return lambda x: end + (start - end) * np.exp(-1.0 * x / decay)
 
     def get_state(self, game):
-        # the state will be a matrix of the game state
-        # 1 for snake head
-        # 2 for snake body
-        # 3 for food
+        # # the state will be a matrix of the game state
+        # # 1 for snake head
+        # # 2 for snake body
+        # # 3 for food
 
-        state = np.zeros(
-            (game.w // game.block_size, game.h // game.block_size), dtype=np.float32
-        )
+        # state = np.zeros(
+        #     (game.w // game.block_size, game.h // game.block_size), dtype=np.float32
+        # )
+
+        # head = game.snake[0]
+        # state[
+        #     int(head.x // game.block_size) - 1, int(head.y // game.block_size) - 1
+        # ] = 1
+        # for point in game.snake[1:]:
+        #     state[
+        #         int(point.x // game.block_size) - 1, int(point.y // game.block_size) - 1
+        #     ] = 2
+        # state[
+        #     int(game.food.x // game.block_size) - 1,
+        #     int(game.food.y // game.block_size) - 1,
+        # ] = 4
+
+        # state /= 4  # normalize
+
+        # # return as [1, 1, 32, 32] toch tensor
+        # # state = torch.from_numpy(state)
+        # # state = torch.reshape(state, (1, 1, state.shape[0], state.shape[1]))
+
+        # # build sequence using previous state and update prev
+        # state_sequence = np.asarray([self.prev_state, state])
+        # self.prev_state = state
+
+        # # reshape for lininar network
+        # if state_sequence[0] is not None:
+        #     state_sequence = np.stack(state_sequence)
+        #     state_sequence = state_sequence.reshape(32*32*2)
+
+        # return state_sequence
 
         head = game.snake[0]
-        state[
-            int(head.x // game.block_size) - 1, int(head.y // game.block_size) - 1
-        ] = 1
-        for point in game.snake[1:]:
-            state[
-                int(point.x // game.block_size) - 1, int(point.y // game.block_size) - 1
-            ] = 2
-        state[
-            int(game.food.x // game.block_size) - 1,
-            int(game.food.y // game.block_size) - 1,
-        ] = 4
+        point_l = Point(head.x - game.block_size, head.y)
+        point_r = Point(head.x + game.block_size, head.y)
+        point_u = Point(head.x, head.y - game.block_size)
+        point_d = Point(head.x, head.y + game.block_size)
 
-        state /= 4  # normalize
+        dir_l = game.direction == Direction.LEFT
+        dir_r = game.direction == Direction.RIGHT
+        dir_u = game.direction == Direction.UP
+        dir_d = game.direction == Direction.DOWN
 
-        # return as [1, 1, 32, 32] toch tensor
-        # state = torch.from_numpy(state)
-        # state = torch.reshape(state, (1, 1, state.shape[0], state.shape[1]))
+        state = [
+            # Danger straight
+            (dir_r and game.is_collision(point_r))
+            or (dir_l and game.is_collision(point_l))
+            or (dir_u and game.is_collision(point_u))
+            or (dir_d and game.is_collision(point_d)),
+            # Danger right
+            (dir_u and game.is_collision(point_r))
+            or (dir_d and game.is_collision(point_l))
+            or (dir_l and game.is_collision(point_u))
+            or (dir_r and game.is_collision(point_d)),
+            # Danger left
+            (dir_d and game.is_collision(point_r))
+            or (dir_u and game.is_collision(point_l))
+            or (dir_r and game.is_collision(point_u))
+            or (dir_l and game.is_collision(point_d)),
+            # Move direction
+            dir_l,
+            dir_r,
+            dir_u,
+            dir_d,
+            # Food location
+            game.food.x < game.head.x,  # food left
+            game.food.x > game.head.x,  # food right
+            game.food.y < game.head.y,  # food up
+            game.food.y > game.head.y,  # food down
+        ]
 
-        # build sequence using previous state and update prev
-        state_sequence = np.asarray([self.prev_state, state])
-        self.prev_state = state
+        state = np.asarray(state)
+        state = state.astype(np.float32)
 
-        return state_sequence
+        return state
 
     def compute_td_loss(self, batch_size):
         state, action, reward, next_state, done = self.replay_buffer.sample(batch_size)
 
         state = torch.from_numpy(state)
         next_state = torch.from_numpy(next_state)
-
-        action = Variable(torch.LongTensor(action))
-        reward = Variable(torch.FloatTensor(reward))
-        done = Variable(torch.FloatTensor(done))
+        action = torch.LongTensor(action)
+        reward = torch.FloatTensor(reward)
+        done = torch.FloatTensor(done)
 
         q_values = self.train_model(state)
-        next_q_values = self.train_model(next_state)
-
         q_value = q_values.gather(1, action).squeeze(1)
+
+        next_q_values = self.target_model(next_state).detach()
         next_q_value = next_q_values.max(1)[0]
+
         expected_q_value = reward + self.gamma * next_q_value * (1 - done)
 
-        expected_q_value_data = Variable(expected_q_value.data)
-        expected_q_value_data = torch.unsqueeze(expected_q_value_data, 0)
-        expected_q_value_data = torch.transpose(expected_q_value_data, 0, 1)
+        expected_q_value_data = expected_q_value
+        expected_q_value_data = torch.unsqueeze(expected_q_value_data, 1)
 
         loss = (q_value - expected_q_value_data).pow(2).mean()
 
@@ -137,11 +178,12 @@ class AgentConvDQN:
             state = torch.unsqueeze(state, 0)
 
             # print("Shape of tensor: ", state.shape)
-            q_value = self.target_model.forward(state)
+           
+            q_value = self.train_model.forward(state)
             action = q_value.max(1)[1].data[0]
             action = action.item()
         else:
-            action = random.randrange(self.target_model.num_actions)
+            action = random.randrange(self.train_model.num_actions)
             # action = random.randrange(env.action_space.n)
 
         # transform single value to vector
@@ -150,6 +192,7 @@ class AgentConvDQN:
 
         return action_vec, action
 
+# register mean value of taken action
 
 def train():
 
@@ -162,7 +205,7 @@ def train():
     batch_size = 32
     train_frequency = 4  # train again after each n new samples
     target_update_frequency = (
-        500  # update target network after 500 training network trainings
+        200  # update target network after 1000 training network updates or should this be game steps?
     )
 
     losses = []
@@ -175,12 +218,16 @@ def train():
     # use sequence of 2 frames
     # number of chanels is 2
     # channels, width, height
-    input_shape = (2, 32, 32)
+    # input_shape = (2, 32, 32)
+    # output_shape = 3
+    # train_model = Conv_QNet(input_shape, output_shape)
+
+    input_shape = 11
     output_shape = 3
-    train_model = Conv_QNet(input_shape, output_shape)
+    train_model = Linear_QNet(input_shape, output_shape)
     target_model = copy.deepcopy(train_model)
 
-    optimizer = optim.Adam(train_model.parameters(), lr=0.01)
+    optimizer = optim.Adam(train_model.parameters(), lr=0.0000625, eps=0.00015)
 
     agent = AgentConvDQN(
         train_model=train_model, target_model=target_model, optimizer=optimizer
@@ -190,8 +237,10 @@ def train():
     train_freq_counter = 1
     target_update_counter = 1
     taken_actions = []
-    while True:
+    game_step_nr = []
 
+    q_print_counter = 0
+    while True:
         # get old state
         state = agent.get_state(game)
 
@@ -249,6 +298,20 @@ def train():
             plot_mean_scores.append(mean_score)
 
             plot(plot_scores, plot_mean_scores)
+
+            game_step_nr.append(game.frame_iteration)
+            sns.lineplot(game_step_nr)
+
+            q_print_counter += 1
+
+            if q_print_counter % 100 == 0:
+                q_print_counter = 0
+
+                state, action, reward, next_state, done = agent.replay_buffer.sample(batch_size)
+
+                state = torch.from_numpy(state)
+                q_values = agent.train_model(state)
+                print(q_values)
 
 
 if __name__ == "__main__":
